@@ -28,7 +28,7 @@
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             width: 100%;
-            max-width: 500px;
+            max-width: 550px;
             padding: 40px;
             position: relative;
             overflow: hidden;
@@ -324,14 +324,86 @@
             border-color: #667eea;
         }
         
+        .class-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .class-option {
+            background: #f8f9ff;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .class-option:hover {
+            background: #eef2ff;
+            border-color: #667eea;
+        }
+        
+        .class-option.selected {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .class-option.year7 { background: #ffeaea; border-color: #ffcccc; }
+        .class-option.year8 { background: #fff0e6; border-color: #ffd9b3; }
+        .class-option.year9 { background: #ffffe6; border-color: #ffffb3; }
+        .class-option.year10 { background: #e6ffe6; border-color: #b3ffb3; }
+        .class-option.year11 { background: #e6f7ff; border-color: #b3e6ff; }
+        .class-option.year12 { background: #f0e6ff; border-color: #d9b3ff; }
+        .class-option.year13 { background: #ffe6ff; border-color: #ffb3ff; }
+        
+        .class-option.selected.year7 { background: #ff6666; color: white; }
+        .class-option.selected.year8 { background: #ff9933; color: white; }
+        .class-option.selected.year9 { background: #ffcc00; color: white; }
+        .class-option.selected.year10 { background: #33cc33; color: white; }
+        .class-option.selected.year11 { background: #3399ff; color: white; }
+        .class-option.selected.year12 { background: #9966ff; color: white; }
+        .class-option.selected.year13 { background: #ff66ff; color: white; }
+        
         @media (max-width: 600px) {
             .container {
                 padding: 25px;
+                max-width: 95%;
             }
             
             h1 {
                 font-size: 20px;
             }
+            
+            .class-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .form-row .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        
+        .history-class {
+            display: inline-block;
+            background: #f0f2ff;
+            color: #667eea;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-left: 5px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -387,6 +459,13 @@
             </div>
             
             <div class="form-group">
+                <label>Select Class</label>
+                <div class="class-grid" id="classGrid">
+                    <!-- Classes will be populated by JavaScript -->
+                </div>
+            </div>
+            
+            <div class="form-group">
                 <label>Exam Paper (PDF, DOCX, JPG, JPEG, PNG, DOC)</label>
                 <div class="file-input-container" id="fileDropArea">
                     <input type="file" id="fileInput" class="file-input" accept=".pdf,.docx,.jpg,.jpeg,.png,.doc">
@@ -420,9 +499,21 @@
         // Initialize Supabase Client
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
+        // Define all available classes
+        const ALL_CLASSES = [
+            'YEAR 7 A', 'YEAR 7 B',
+            'YEAR 8 A', 'YEAR 8 B',
+            'YEAR 9',
+            'YEAR 10',
+            'YEAR 11',
+            'YEAR 12',
+            'YEAR 13'
+        ];
+        
         // Global variables
         let currentTeacher = null;
         let selectedFile = null;
+        let selectedClass = null;
         
         // DOM Elements
         const loginForm = document.getElementById('loginForm');
@@ -443,6 +534,35 @@
         const loadingDiv = document.getElementById('loading');
         const loadingText = document.getElementById('loadingText');
         const subjectChips = document.querySelectorAll('.subject-chip');
+        const classGrid = document.getElementById('classGrid');
+        
+        // Initialize the class grid
+        function initializeClassGrid() {
+            classGrid.innerHTML = '';
+            ALL_CLASSES.forEach(className => {
+                const year = className.split(' ')[1]; // Extract year number
+                const classOption = document.createElement('div');
+                classOption.className = `class-option year${year}`;
+                classOption.textContent = className;
+                classOption.dataset.class = className;
+                
+                classOption.addEventListener('click', () => {
+                    // Deselect all classes
+                    document.querySelectorAll('.class-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    
+                    // Select this class
+                    classOption.classList.add('selected');
+                    selectedClass = className;
+                    
+                    // Enable/disable upload button based on form completion
+                    validateUploadForm();
+                });
+                
+                classGrid.appendChild(classOption);
+            });
+        }
         
         // Event Listeners
         loginBtn.addEventListener('click', handleLogin);
@@ -460,6 +580,9 @@
         
         // Subject input validation
         subjectInput.addEventListener('input', validateUploadForm);
+        
+        // Teacher name input validation
+        teacherNameInput.addEventListener('input', validateUploadForm);
         
         // Drag and drop events
         fileDropArea.addEventListener('dragover', (e) => {
@@ -480,21 +603,10 @@
             }
         });
         
-        // Form validation
-        [teacherNameInput, subjectInput].forEach(element => {
-            element.addEventListener('input', validateUploadForm);
-        });
-        
-        // Auto-fill email domain
-        emailInput.addEventListener('blur', function() {
-            if (this.value && !this.value.includes('@')) {
-                this.value += '@chindamanee.ac.th';
-            }
-        });
-        
         function validateUploadForm() {
             const isValid = teacherNameInput.value.trim() && 
                            subjectInput.value.trim() && 
+                           selectedClass &&
                            selectedFile;
             uploadBtn.disabled = !isValid;
         }
@@ -533,6 +645,9 @@
                 
                 // Check if teacher exists in database, create if not
                 await ensureTeacherExists(email, teacherName);
+                
+                // Initialize class grid
+                initializeClassGrid();
                 
                 // Auto-fill name field
                 teacherNameInput.value = teacherName;
@@ -616,6 +731,11 @@
                 return;
             }
             
+            if (!selectedClass) {
+                showMessage('Please select a class', 'error');
+                return;
+            }
+            
             showLoading(true, 'Starting upload...');
             
             try {
@@ -624,12 +744,13 @@
                 const fileExtension = selectedFile.name.split('.').pop().toLowerCase();
                 const safeTeacherName = cleanFileName(teacherName);
                 const safeSubject = cleanFileName(subject);
+                const safeClass = cleanFileName(selectedClass);
                 
-                // Create filename: TeacherName_Subject_Timestamp.Extension
-                const fileName = `${safeTeacherName}_${safeSubject}_${timestamp}.${fileExtension}`;
+                // Create filename: TeacherName_Subject_Class_Timestamp.Extension
+                const fileName = `${safeTeacherName}_${safeSubject}_${safeClass}_${timestamp}.${fileExtension}`;
                 
-                // Define storage path: teachername/subject/filename
-                const folderPath = `${safeTeacherName}/${safeSubject}/`;
+                // Define storage path: teachername/subject/class/filename
+                const folderPath = `${safeTeacherName}/${safeSubject}/${safeClass}/`;
                 const storagePath = `${folderPath}${fileName}`;
                 
                 // Upload file to Supabase Storage
@@ -641,16 +762,20 @@
                 
                 // Save upload record to database
                 showLoading(true, 'Saving upload record...');
-                await saveUploadRecord(teacherId, teacherName, subject, fileName, fileUrl, selectedFile);
+                await saveUploadRecord(teacherId, teacherName, subject, selectedClass, fileName, fileUrl, selectedFile);
                 
                 // Update teacher's subject in database
                 await updateTeacherSubject(currentTeacher.email, subject);
                 
                 // Clear form
                 selectedFile = null;
+                selectedClass = null;
                 fileInput.value = '';
                 filePreview.innerHTML = '';
                 filePreview.classList.remove('show');
+                document.querySelectorAll('.class-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
                 uploadBtn.disabled = true;
                 
                 // Reload history
@@ -758,11 +883,12 @@
             }
         }
         
-        async function saveUploadRecord(teacherId, teacherName, subject, fileName, fileUrl, file) {
+        async function saveUploadRecord(teacherId, teacherName, subject, className, fileName, fileUrl, file) {
             const uploadData = {
                 teacher_id: teacherId,
                 teacher_name: teacherName,
                 subject: subject,
+                class_name: className,
                 filename: fileName,
                 file_url: fileUrl,
                 file_size: file.size,
@@ -819,9 +945,17 @@
                     else if (fileType.includes('word') || fileType.includes('doc')) fileIcon = '📘';
                     else if (fileType.includes('image')) fileIcon = '🖼️';
                     
+                    // Get class badge color based on year
+                    let classBadgeColor = '';
+                    if (upload.class_name) {
+                        const year = upload.class_name.split(' ')[1];
+                        classBadgeColor = `year${year}`;
+                    }
+                    
                     return `
                         <div class="history-item">
-                            <strong>${fileIcon} ${upload.subject}</strong><br>
+                            <strong>${fileIcon} ${upload.subject}</strong>
+                            ${upload.class_name ? `<span class="history-class ${classBadgeColor}">${upload.class_name}</span>` : ''}<br>
                             <small>File: ${upload.filename}</small><br>
                             <small>📅 Uploaded: ${formattedDate}</small><br>
                             <a href="${upload.file_url}" target="_blank" class="file-link">⬇️ Download File</a>
@@ -883,6 +1017,7 @@
         
         function handleLogout() {
             currentTeacher = null;
+            selectedClass = null;
             localStorage.removeItem('teacherEmail');
             localStorage.removeItem('teacherName');
             
@@ -895,6 +1030,9 @@
             selectedFile = null;
             filePreview.innerHTML = '';
             filePreview.classList.remove('show');
+            document.querySelectorAll('.class-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
             messageDiv.className = 'message';
             uploadBtn.disabled = true;
             
@@ -958,6 +1096,9 @@
                     showLoading(false);
                 }
             }
+            
+            // Initialize class grid
+            initializeClassGrid();
         });
         
         // Allow pressing Enter to login
