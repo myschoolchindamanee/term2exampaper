@@ -300,6 +300,30 @@
             text-decoration: underline;
         }
         
+        .subject-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .subject-chip {
+            background: #f0f2ff;
+            color: #667eea;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid #d0d7ff;
+            transition: all 0.2s ease;
+        }
+        
+        .subject-chip:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
         @media (max-width: 600px) {
             .container {
                 padding: 25px;
@@ -346,24 +370,24 @@
             </div>
             
             <div class="form-group">
-                <label for="subject">Subject</label>
-                <select id="subject">
-                    <option value="">Select Subject</option>
-                    <option value="mathematics">Mathematics</option>
-                    <option value="science">Science</option>
-                    <option value="english">English</option>
-                    <option value="social_studies">Social Studies</option>
-                    <option value="thai">Thai Language</option>
-                    <option value="physics">Physics</option>
-                    <option value="chemistry">Chemistry</option>
-                    <option value="biology">Biology</option>
-                    <option value="computer">Computer Science</option>
-                    <option value="other">Other</option>
-                </select>
+                <label for="subjectInput">Subject You Teach</label>
+                <input type="text" id="subjectInput" placeholder="e.g., Mathematics, Science, English, etc." autocomplete="off">
+                <div class="subject-suggestions">
+                    <div class="subject-chip" data-subject="Mathematics">Mathematics</div>
+                    <div class="subject-chip" data-subject="Science">Science</div>
+                    <div class="subject-chip" data-subject="English">English</div>
+                    <div class="subject-chip" data-subject="Social Studies">Social Studies</div>
+                    <div class="subject-chip" data-subject="Thai Language">Thai Language</div>
+                    <div class="subject-chip" data-subject="Physics">Physics</div>
+                    <div class="subject-chip" data-subject="Chemistry">Chemistry</div>
+                    <div class="subject-chip" data-subject="Biology">Biology</div>
+                    <div class="subject-chip" data-subject="Computer Science">Computer Science</div>
+                    <div class="subject-chip" data-subject="History">History</div>
+                </div>
             </div>
             
             <div class="form-group">
-                <label>Exam Paper (PDF, DOCX, JPG, JPEG)</label>
+                <label>Exam Paper (PDF, DOCX, JPG, JPEG, PNG, DOC)</label>
                 <div class="file-input-container" id="fileDropArea">
                     <input type="file" id="fileInput" class="file-input" accept=".pdf,.docx,.jpg,.jpeg,.png,.doc">
                     <label for="fileInput" class="file-label">📎 Click to choose file or drag & drop</label>
@@ -384,12 +408,12 @@
         
         <div id="loading" class="loading">
             <div class="spinner"></div>
-            <p>Processing...</p>
+            <p id="loadingText">Processing...</p>
         </div>
     </div>
 
     <script>
-        // Supabase Configuration - YOUR ACTUAL CREDENTIALS
+        // Supabase Configuration
         const SUPABASE_URL = 'https://sndegdrnbnyispdoetkc.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuZGVnZHJuYm55aXNwZG9ldGtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNTIxNzcsImV4cCI6MjA4MDgyODE3N30.REmEoucoa5wfY1vn4V5dWHmAxRqU6xAxvy1rKxg7ZGE';
         
@@ -407,7 +431,7 @@
         const passwordInput = document.getElementById('password');
         const loginBtn = document.getElementById('loginBtn');
         const teacherNameInput = document.getElementById('teacherName');
-        const subjectSelect = document.getElementById('subject');
+        const subjectInput = document.getElementById('subjectInput');
         const fileInput = document.getElementById('fileInput');
         const fileDropArea = document.getElementById('fileDropArea');
         const filePreview = document.getElementById('filePreview');
@@ -417,12 +441,25 @@
         const historyList = document.getElementById('historyList');
         const logoutBtn = document.getElementById('logoutBtn');
         const loadingDiv = document.getElementById('loading');
+        const loadingText = document.getElementById('loadingText');
+        const subjectChips = document.querySelectorAll('.subject-chip');
         
         // Event Listeners
         loginBtn.addEventListener('click', handleLogin);
         uploadBtn.addEventListener('click', handleUpload);
         logoutBtn.addEventListener('click', handleLogout);
         fileInput.addEventListener('change', handleFileSelect);
+        
+        // Subject chips click handlers
+        subjectChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                subjectInput.value = chip.getAttribute('data-subject');
+                validateUploadForm();
+            });
+        });
+        
+        // Subject input validation
+        subjectInput.addEventListener('input', validateUploadForm);
         
         // Drag and drop events
         fileDropArea.addEventListener('dragover', (e) => {
@@ -444,7 +481,7 @@
         });
         
         // Form validation
-        [teacherNameInput, subjectSelect].forEach(element => {
+        [teacherNameInput, subjectInput].forEach(element => {
             element.addEventListener('input', validateUploadForm);
         });
         
@@ -457,7 +494,7 @@
         
         function validateUploadForm() {
             const isValid = teacherNameInput.value.trim() && 
-                           subjectSelect.value && 
+                           subjectInput.value.trim() && 
                            selectedFile;
             uploadBtn.disabled = !isValid;
         }
@@ -476,7 +513,7 @@
                 return;
             }
             
-            showLoading(true);
+            showLoading(true, 'Logging in...');
             
             try {
                 // Extract teacher name from email
@@ -538,7 +575,7 @@
                             {
                                 email: email,
                                 name: name,
-                                subject: 'not_set',
+                                subject: 'to_be_set',
                                 last_login: new Date().toISOString()
                             }
                         ]);
@@ -567,37 +604,47 @@
             }
             
             const teacherName = teacherNameInput.value.trim();
-            const subject = subjectSelect.value;
+            const subject = subjectInput.value.trim();
             
-            if (!teacherName || !subject) {
-                showMessage('Please fill in all fields', 'error');
+            if (!teacherName) {
+                showMessage('Please enter your name', 'error');
                 return;
             }
             
-            showLoading(true);
+            if (!subject) {
+                showMessage('Please enter the subject', 'error');
+                return;
+            }
+            
+            showLoading(true, 'Starting upload...');
             
             try {
-                // Create a unique filename
+                // Create a safe filename
                 const timestamp = Date.now();
                 const fileExtension = selectedFile.name.split('.').pop().toLowerCase();
-                const safeTeacherName = teacherName.replace(/[^a-zA-Z0-9]/g, '_');
-                const safeSubject = subject.replace(/[^a-zA-Z0-9]/g, '_');
+                const safeTeacherName = cleanFileName(teacherName);
+                const safeSubject = cleanFileName(subject);
+                
+                // Create filename: TeacherName_Subject_Timestamp.Extension
                 const fileName = `${safeTeacherName}_${safeSubject}_${timestamp}.${fileExtension}`;
                 
-                // Define storage path
+                // Define storage path: teachername/subject/filename
                 const folderPath = `${safeTeacherName}/${safeSubject}/`;
                 const storagePath = `${folderPath}${fileName}`;
                 
                 // Upload file to Supabase Storage
-                showLoadingMessage('Uploading file...');
+                showLoading(true, 'Uploading file to storage...');
                 const fileUrl = await uploadToSupabaseStorage(selectedFile, storagePath);
                 
                 // Get teacher ID from database
                 const teacherId = await getTeacherId(currentTeacher.email);
                 
                 // Save upload record to database
-                showLoadingMessage('Saving record...');
+                showLoading(true, 'Saving upload record...');
                 await saveUploadRecord(teacherId, teacherName, subject, fileName, fileUrl, selectedFile);
+                
+                // Update teacher's subject in database
+                await updateTeacherSubject(currentTeacher.email, subject);
                 
                 // Clear form
                 selectedFile = null;
@@ -612,14 +659,25 @@
                 showMessage('Thank you teacher, your paper has been submitted successfully!', 'success');
                 
             } catch (error) {
-                showMessage('Upload failed. Please try again. Error: ' + error.message, 'error');
+                showMessage('Upload failed: ' + error.message, 'error');
                 console.error('Upload error:', error);
             } finally {
                 showLoading(false);
             }
         }
         
+        function cleanFileName(text) {
+            // Remove special characters, replace spaces with underscores
+            return text
+                .toLowerCase()
+                .replace(/[^a-z0-9ก-๙\s]/gi, '') // Keep Thai characters too
+                .replace(/\s+/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_+|_+$/g, '');
+        }
+        
         async function uploadToSupabaseStorage(file, storagePath) {
+            // First, try to upload the file
             const { data, error } = await supabase.storage
                 .from('exam-papers')
                 .upload(storagePath, file, {
@@ -628,14 +686,36 @@
                 });
             
             if (error) {
-                // If folder doesn't exist, try creating it
+                // Check if it's a bucket error
                 if (error.message.includes('Bucket not found')) {
-                    throw new Error('Please create "exam-papers" bucket in Supabase Storage first');
+                    throw new Error('Storage bucket not found. Please create "exam-papers" bucket in Supabase Storage.');
                 }
+                
+                // Check if it's a duplicate file error
+                if (error.message.includes('duplicate')) {
+                    // Generate a new filename with random suffix
+                    const newStoragePath = storagePath.replace(/\.([a-z]+)$/, `_${Math.random().toString(36).substr(2, 5)}.$1`);
+                    const { data: newData, error: newError } = await supabase.storage
+                        .from('exam-papers')
+                        .upload(newStoragePath, file, {
+                            cacheControl: '3600',
+                            upsert: false
+                        });
+                    
+                    if (newError) throw newError;
+                    
+                    // Get public URL for new file
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('exam-papers')
+                        .getPublicUrl(newStoragePath);
+                    
+                    return publicUrl;
+                }
+                
                 throw error;
             }
             
-            // Get public URL
+            // Get public URL for uploaded file
             const { data: { publicUrl } } = supabase.storage
                 .from('exam-papers')
                 .getPublicUrl(storagePath);
@@ -660,6 +740,21 @@
             } catch (error) {
                 console.warn('Error getting teacher ID:', error);
                 return null;
+            }
+        }
+        
+        async function updateTeacherSubject(email, subject) {
+            try {
+                const { error } = await supabase
+                    .from('teachers')
+                    .update({ subject: subject })
+                    .eq('email', email);
+                
+                if (error) {
+                    console.warn('Failed to update teacher subject:', error);
+                }
+            } catch (error) {
+                console.warn('Error updating teacher subject:', error);
             }
         }
         
@@ -717,18 +812,25 @@
                         minute: '2-digit'
                     });
                     
+                    // Get file icon based on type
+                    const fileType = upload.file_type || '';
+                    let fileIcon = '📄';
+                    if (fileType.includes('pdf')) fileIcon = '📕';
+                    else if (fileType.includes('word') || fileType.includes('doc')) fileIcon = '📘';
+                    else if (fileType.includes('image')) fileIcon = '🖼️';
+                    
                     return `
                         <div class="history-item">
-                            <strong>${upload.subject.toUpperCase()}</strong><br>
-                            ${upload.filename}<br>
-                            <small>Uploaded: ${formattedDate}</small><br>
-                            <a href="${upload.file_url}" target="_blank" class="file-link">📄 View/Download</a>
+                            <strong>${fileIcon} ${upload.subject}</strong><br>
+                            <small>File: ${upload.filename}</small><br>
+                            <small>📅 Uploaded: ${formattedDate}</small><br>
+                            <a href="${upload.file_url}" target="_blank" class="file-link">⬇️ Download File</a>
                         </div>
                     `;
                 }).join('');
             } else {
                 historySection.classList.add('show');
-                historyList.innerHTML = '<div class="history-item">No uploads yet</div>';
+                historyList.innerHTML = '<div class="history-item">No uploads yet. Your first upload will appear here.</div>';
             }
         }
         
@@ -766,9 +868,13 @@
             selectedFile = file;
             
             // Show file preview
+            const fileSize = file.size < 1024 * 1024 
+                ? `${(file.size / 1024).toFixed(2)} KB` 
+                : `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+            
             filePreview.innerHTML = `
                 <strong>📄 Selected File:</strong> ${file.name}<br>
-                <small>Size: ${(file.size / 1024).toFixed(2)} KB | Type: ${fileExtension.toUpperCase()}</small>
+                <small>Size: ${fileSize} | Type: ${fileExtension.toUpperCase()}</small>
             `;
             filePreview.classList.add('show');
             
@@ -784,7 +890,7 @@
             emailInput.value = '';
             passwordInput.value = '';
             teacherNameInput.value = '';
-            subjectSelect.value = '';
+            subjectInput.value = '';
             fileInput.value = '';
             selectedFile = null;
             filePreview.innerHTML = '';
@@ -809,12 +915,9 @@
             }
         }
         
-        function showLoading(show) {
+        function showLoading(show, text = 'Processing...') {
+            loadingText.textContent = text;
             loadingDiv.classList.toggle('show', show);
-        }
-        
-        function showLoadingMessage(text) {
-            loadingDiv.querySelector('p').textContent = text;
         }
         
         // Check for saved login on page load
@@ -825,8 +928,7 @@
             if (savedEmail && savedEmail.endsWith('@chindamanee.ac.th')) {
                 // Test Supabase connection
                 try {
-                    showLoadingMessage('Checking connection...');
-                    showLoading(true);
+                    showLoading(true, 'Checking connection...');
                     
                     // Test if Supabase is accessible
                     const { data, error } = await supabase
@@ -876,29 +978,14 @@
             }
         });
         
-        // Add some helpful subject autocomplete
-        subjectSelect.addEventListener('focus', function() {
-            if (!this.value) {
-                this.innerHTML = `
-                    <option value="">Select Subject</option>
-                    <option value="mathematics">Mathematics</option>
-                    <option value="science">Science</option>
-                    <option value="english">English</option>
-                    <option value="social_studies">Social Studies</option>
-                    <option value="thai">Thai Language</option>
-                    <option value="physics">Physics</option>
-                    <option value="chemistry">Chemistry</option>
-                    <option value="biology">Biology</option>
-                    <option value="computer">Computer Science</option>
-                    <option value="art">Art</option>
-                    <option value="music">Music</option>
-                    <option value="pe">Physical Education</option>
-                    <option value="history">History</option>
-                    <option value="geography">Geography</option>
-                    <option value="economics">Economics</option>
-                    <option value="business">Business Studies</option>
-                    <option value="other">Other</option>
-                `;
+        // Allow pressing Enter in subject field to validate form
+        subjectInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                validateUploadForm();
+                if (!uploadBtn.disabled) {
+                    uploadBtn.focus();
+                }
             }
         });
     </script>
